@@ -1,0 +1,11 @@
+**/.venv
+**/__pycache__
+**/*.pyc
+**/node_modules
+.env
+.git
+*.md
+MustReadFirst_donotcommit
+client_node
+.agents
+worker_node/.venv

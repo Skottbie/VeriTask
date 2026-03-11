@@ -1,0 +1,13 @@
+services:
+  worker:
+    build:
+      context: ..
+      dockerfile: worker_node/Dockerfile
+    ports:
+      - "8001:8001"
+    volumes:
+      # Required for dstack SDK TEE attestation (dstack OS 0.5.x)
+      - /var/run/dstack.sock:/var/run/dstack.sock
+    env_file:
+      - ../.env
+    restart: unless-stopped

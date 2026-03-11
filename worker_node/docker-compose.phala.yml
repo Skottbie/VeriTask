@@ -1,0 +1,21 @@
+# VeriTask 3.0 — Phala Cloud CVM Deployment
+# Paste this into Phala Cloud Dashboard → Deploy → docker-compose.yml
+#
+# Prerequisites:
+#   1. Push Docker image: docker push <your-dockerhub>/veritask-worker:latest
+#   2. Set Encrypted Secrets in Phala Cloud Dashboard:
+#      - WORKER_PRIVATE_KEY
+#      - OKX_API_KEY (optional, Worker doesn't need OKX auth)
+#
+# The dstack socket is automatically available inside Phala Cloud CVM.
+
+services:
+  worker:
+    image: skottbie/veritask-worker:latest
+    ports:
+      - 8001:8001
+    volumes:
+      # Required for dstack SDK TEE attestation (dstack OS 0.5.x)
+      - /var/run/dstack.sock:/var/run/dstack.sock
+    environment:
+      - WORKER_PRIVATE_KEY=${WORKER_PRIVATE_KEY}

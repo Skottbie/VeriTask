@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ProofBundle",
+  "description": "Worker's response containing data + cryptographic proofs",
+  "type": "object",
+  "required": ["task_id", "data", "zk_proof", "tee_attestation", "worker_pubkey", "timestamp"],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "description": "Echoed task_id from TaskIntent"
+    },
+    "data": {
+      "type": "object",
+      "description": "Task result data",
+      "properties": {
+        "protocol": { "type": "string" },
+        "tvl_usd": { "type": "number" },
+        "fetched_at": { "type": "string", "format": "date-time" },
+        "source_url": { "type": "string", "format": "uri" }
+      },
+      "required": ["protocol", "tvl_usd", "fetched_at", "source_url"]
+    },
+    "zk_proof": {
+      "type": "object",
+      "description": "Data provenance proof (Reclaim zkFetch or SHA256 fallback)",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["reclaim_zkfetch", "sha256_mock"],
+          "description": "Proof mechanism used"
+        },
+        "hash": {
+          "type": "string",
+          "description": "SHA-256 hash of the data payload"
+        },
+        "proof": {
+          "type": ["object", "null"],
+          "description": "Reclaim zkProof object (null if fallback)"
+        },
+        "note": {
+          "type": "string",
+          "description": "Human-readable note about proof status"
+        }
+      },
+      "required": ["type", "hash"]
+    },
+    "tee_attestation": {
+      "type": "object",
+      "description": "TEE execution environment proof (Intel TDX or mock)",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["intel_tdx", "mock_tdx"],
+          "description": "Attestation mechanism"
+        },
+        "report_data": {
+          "type": "string",
+          "description": "Hex-encoded report_data bound to data hash"
+        },
+        "quote": {
+          "type": ["string", "null"],
+          "description": "Base64-encoded TDX quote (null if mock)"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": ["type", "report_data"]
+    },
+    "worker_pubkey": {
+      "type": "string",
+      "description": "Worker's Ethereum public address"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of proof generation"
+    }
+  }
+}

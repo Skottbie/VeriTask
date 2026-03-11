@@ -1,0 +1,28 @@
+{
+  "agent": {
+    "name": "veritask-worker",
+    "description": "VeriTask 3.0 Worker Agent — Executes verifiable data tasks inside TEE. Fetches DeFi data from DefiLlama, generates cryptographic ProofBundle with zkTLS + Intel TDX attestation, and serves results via FastAPI.",
+    "model": "claude-sonnet-4-20250514",
+    "temperature": 0.2
+  },
+  "channels": {
+    "terminal": { "enabled": true },
+    "api": { "enabled": true }
+  },
+  "skills": {
+    "load": {
+      "watch": true,
+      "watchDebounceMs": 250
+    },
+    "entries": {
+      "defi-scraper": { "enabled": true },
+      "proof-generator": {
+        "enabled": true,
+        "env": {
+          "WORKER_PRIVATE_KEY": ""
+        }
+      }
+    }
+  },
+  "version": "3.0.0"
+}

@@ -1,0 +1,38 @@
+{
+  "agent": {
+    "name": "veritask-client",
+    "description": "VeriTask 3.0 Client Agent — C2C verifiable micro-procurement orchestrator. Delegates tasks to Worker, verifies cryptographic proofs, and executes gasless USDT payments via OKX x402 on X Layer.",
+    "model": "claude-sonnet-4-20250514",
+    "temperature": 0.3
+  },
+  "channels": {
+    "terminal": { "enabled": true },
+    "telegram": { "enabled": false },
+    "whatsapp": { "enabled": false }
+  },
+  "skills": {
+    "load": {
+      "watch": true,
+      "watchDebounceMs": 250
+    },
+    "entries": {
+      "task-delegator": { "enabled": true },
+      "verifier": { "enabled": true },
+      "okx-x402-payer": {
+        "enabled": true,
+        "env": {
+          "OKX_API_KEY": "",
+          "OKX_SECRET_KEY": "",
+          "OKX_PASSPHRASE": "",
+          "CLIENT_PRIVATE_KEY": ""
+        }
+      },
+      "okx-wallet-portfolio": { "enabled": true },
+      "okx-dex-swap": { "enabled": true },
+      "okx-dex-market": { "enabled": true },
+      "okx-dex-token": { "enabled": true },
+      "okx-onchain-gateway": { "enabled": true }
+    }
+  },
+  "version": "3.2.0"
+}

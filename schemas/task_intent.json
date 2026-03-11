@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TaskIntent",
+  "description": "C2C task request from Client Agent to Worker Agent",
+  "type": "object",
+  "required": ["task_id", "type", "params", "client_wallet"],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "description": "Unique task identifier (UUID v4)"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["defi_tvl"],
+      "description": "Task type — currently only defi_tvl supported"
+    },
+    "params": {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "type": "string",
+          "description": "DefiLlama protocol slug, e.g. 'aave'"
+        }
+      },
+      "required": ["protocol"]
+    },
+    "client_wallet": {
+      "type": "string",
+      "pattern": "^0x[0-9a-fA-F]{40}$",
+      "description": "Client's Ethereum address (payer)"
+    }
+  }
+}

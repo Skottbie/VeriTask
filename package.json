@@ -1,0 +1,12 @@
+{
+  "name": "veritask-zkfetch",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reclaim zkFetch bridge for VeriTask Worker",
+  "scripts": {
+    "zkfetch": "node worker_node/skills/proof-generator/zkfetch_bridge.js"
+  },
+  "dependencies": {
+    "@reclaimprotocol/zk-fetch": "^0.8.0"
+  }
+}
