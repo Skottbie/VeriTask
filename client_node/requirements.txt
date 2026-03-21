@@ -1,0 +1,7 @@
+# VeriTask 3.0 — Client Node Dependencies
+# Install: pip install -r client_node/requirements.txt
+
+requests>=2.31.0
+python-dotenv>=1.0.0
+eth-account>=0.13.0
+mcp[cli]>=1.26.0

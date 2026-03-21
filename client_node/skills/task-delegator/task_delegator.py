@@ -15,6 +15,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import uuid
 from pathlib import Path
 
@@ -32,6 +33,15 @@ sys.path.insert(0, str(CLIENT_SKILLS / "okx-x402-payer"))
 
 from verifier import verify_proof_bundle        # noqa: E402
 from okx_x402_payer import execute_payment       # noqa: E402
+
+
+def is_retryable_worker_error(exc: requests.RequestException) -> bool:
+    """Retry only transient transport or 5xx Worker failures."""
+    if isinstance(exc, (requests.ConnectionError, requests.Timeout, requests.exceptions.SSLError)):
+        return True
+    if isinstance(exc, requests.HTTPError) and exc.response is not None:
+        return exc.response.status_code >= 500
+    return False
 
 
 def delegate_task(
@@ -68,17 +78,34 @@ def delegate_task(
     print(f"    Worker:   {worker_url}")
 
     # Step 2: Send to Worker
-    try:
-        resp = requests.post(
-            f"{worker_url}/execute",
-            json=task_intent,
-            timeout=45,
-        )
-        resp.raise_for_status()
-        proof_bundle = resp.json()
-    except requests.RequestException as e:
-        print(f"\033[31m[Client] ❌ Worker request failed: {e}\033[0m", file=sys.stderr)
-        return {"success": False, "error": str(e)}
+    proof_bundle = None
+    last_error = None
+    max_attempts = 2
+    for attempt in range(1, max_attempts + 1):
+        try:
+            resp = requests.post(
+                f"{worker_url}/execute",
+                json=task_intent,
+                timeout=45,
+            )
+            resp.raise_for_status()
+            proof_bundle = resp.json()
+            break
+        except requests.RequestException as e:
+            last_error = e
+            if attempt >= max_attempts or not is_retryable_worker_error(e):
+                print(f"\033[31m[Client] ❌ Worker request failed: {e}\033[0m", file=sys.stderr)
+                return {"success": False, "error": str(e)}
+
+            print(
+                f"\033[33m[Client] ⚠️  Worker request attempt {attempt} failed, retrying: {e}\033[0m",
+                file=sys.stderr,
+            )
+            time.sleep(attempt)
+
+    if proof_bundle is None:
+        print(f"\033[31m[Client] ❌ Worker request failed: {last_error}\033[0m", file=sys.stderr)
+        return {"success": False, "error": str(last_error)}
 
     print(f"\033[32m[Client] 📦 Received ProofBundle from Worker\033[0m")
     tvl = proof_bundle.get("data", {}).get("tvl_usd", 0)
