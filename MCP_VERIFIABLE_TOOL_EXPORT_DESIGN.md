@@ -671,47 +671,75 @@ Once this design enters the Onchain OS AI Hackathon Phase 1 implementation windo
 
 ### 中文
 
-截至 2026-03-21，本设计已完成一次真实 Phase 1 验收闭环，记录如下：
+截至 2026-03-21，本设计已完成两次真实 Phase 1 验收闭环。
+
+#### 第一次验收（sha256_mock + intel_tdx）
 
 1. MCP 入口：本地 stdio MCP export adapter 成功启动，并通过 `tools/list` 与 `resources/list` 发现性验证
 2. 真实任务类型：`aave` TVL 查询
 3. MCP Handle：`vtmcp-515e754b-719a-40a2-a03c-d32eaa160fbf`
 4. Worker Task ID：`4820c376-d617-4d35-af70-35f8c7fcada8`
-5. 结果状态：`completed`，验证状态：`passed`，结算状态：`completed`
-6. 结果对象包含可验证材料：TVL 业务结果、`sha256_mock` ZK 摘要、`intel_tdx` TEE attestation 摘要，以及验证详情
-7. x402 真实结算已在 X Layer 主网完成：
-	- `chain_index`: `196`
-	- `token`: `USDT`
-	- `amount`: `0.01`
-	- `payer`: `0x012E6Cfbbd1Fcf5751d08Ec2919d1C7873A4BB85`
-	- `payee`: `0x871c98e2b2f22b6a215493a96d9eb76ccc0015cb`
-	- `tx_hash`: `0xf8c700edb574af275f22c77ec769af54847c91c27d4afaa4e477230eff99bad6`
-	- `explorer_url`: `https://www.oklink.com/xlayer/tx/0xf8c700edb574af275f22c77ec769af54847c91c27d4afaa4e477230eff99bad6`
-8. 该次真实运行证明本设计已满足 16.2 中定义的最小公共工程闭环要求，即请求、结果、验证、结算与回执在同一条真实链路中全部跑通
+5. ZK 层：`sha256_mock`（当时 Worker CVM 上 zkFetch subprocess timeout=30s，Reclaim Gnark 证明生成需要 40-60s，导致超时回退）
+6. TEE 层：`intel_tdx`（真实 Phala Cloud CVM TDX Quote）
+7. x402 结算 tx_hash：`0xf8c700edb574af275f22c77ec769af54847c91c27d4afaa4e477230eff99bad6`
 
-补充说明：在本次成功结算之前，曾出现一次 `insufficient_funds`。复核后确认，付款地址由 `.env` 中的 `CLIENT_PRIVATE_KEY` 派生，且当时该地址在 X Layer 上的 USDT 余额低于 `0.01`。补足余额后，同一条 MCP 结算路径已成功返回真实交易回执。
+#### 第二次验收（全真实：reclaim_zkfetch + intel_tdx + x402）✅
+
+修复 `proof_generator.py` 中 subprocess timeout 从 30s 提升至 90s（Docker 镜像 `skottbie/veritask-worker:v3.1.8`），重新部署 CVM 后验收：
+
+1. 真实任务类型：`aave` TVL 查询（$25,479,162,974）
+2. **ZK 层：`reclaim_zkfetch`** — Reclaim Protocol 真实 zkTLS 证明
+   - `claimData.provider`: `http`
+   - `claimData.owner`: `0x95c8c603977827846109784e44e73d79214b0fd6`
+   - `signatures`: 1 个 attestor 签名
+   - `witnesses`: `wss://attestor.reclaimprotocol.org:444/ws`
+3. **TEE 层：`intel_tdx`** — Phala Cloud CVM 真实 TDX Quote（7515 bytes）
+4. 本地验证：`is_valid=True, zk_valid=True, tee_valid=True`
+5. **x402 真实结算**：
+   - `chain_index`: `196`（X Layer mainnet）
+   - `token`: `USDT`
+   - `amount`: `0.01`
+   - `payer`: `0x012E6Cfbbd1Fcf5751d08Ec2919d1C7873A4BB85`
+   - `payee`: `0x871c98e2b2f22b6a215493a96d9eb76ccc0015cb`
+   - `tx_hash`: `0x819c0c984abc8cfe804d7023331f44dff9d439d9507584fb0138eeb7bfdd138f`
+   - `explorer_url`: `https://www.oklink.com/xlayer/tx/0x819c0c984abc8cfe804d7023331f44dff9d439d9507584fb0138eeb7bfdd138f`
+6. 该次验收证明三层密码学保证全部为真实生产级组件，无任何 mock 或 fallback
 
 ### English
 
-As of 2026-03-21, this design has completed one real Phase 1 acceptance loop with the following record:
+As of 2026-03-21, this design has completed two real Phase 1 acceptance loops.
+
+#### First Acceptance (sha256_mock + intel_tdx)
 
 1. MCP entrypoint: the local stdio MCP export adapter started successfully and passed discovery validation through `tools/list` and `resources/list`
 2. Real task type: `aave` TVL retrieval
 3. MCP handle: `vtmcp-515e754b-719a-40a2-a03c-d32eaa160fbf`
 4. Worker task ID: `4820c376-d617-4d35-af70-35f8c7fcada8`
-5. Result state: `completed`, verification state: `passed`, settlement state: `completed`
-6. The result object carried verifiable material: TVL business data, a `sha256_mock` ZK summary, an `intel_tdx` TEE attestation summary, and verification details
-7. Real x402 settlement completed on X Layer mainnet:
-	- `chain_index`: `196`
-	- `token`: `USDT`
-	- `amount`: `0.01`
-	- `payer`: `0x012E6Cfbbd1Fcf5751d08Ec2919d1C7873A4BB85`
-	- `payee`: `0x871c98e2b2f22b6a215493a96d9eb76ccc0015cb`
-	- `tx_hash`: `0xf8c700edb574af275f22c77ec769af54847c91c27d4afaa4e477230eff99bad6`
-	- `explorer_url`: `https://www.oklink.com/xlayer/tx/0xf8c700edb574af275f22c77ec769af54847c91c27d4afaa4e477230eff99bad6`
-8. This real run demonstrates that the design now satisfies the minimal public engineering loop defined in section 16.2, with request, result, verification, settlement, and receipt all completed in one live path
+5. ZK layer: `sha256_mock` (the Worker CVM's zkFetch subprocess timeout was 30s, while Reclaim's Gnark proof generation needed 40-60s, causing timeout fallback)
+6. TEE layer: `intel_tdx` (real Phala Cloud CVM TDX Quote)
+7. x402 settlement tx_hash: `0xf8c700edb574af275f22c77ec769af54847c91c27d4afaa4e477230eff99bad6`
 
-Supplemental note: before the successful settlement above, one run returned `insufficient_funds`. Follow-up verification confirmed that the payer address is derived from `CLIENT_PRIVATE_KEY` in `.env`, and that its X Layer USDT balance was below `0.01` at that time. After funding the payer wallet, the same MCP settlement path returned a real transaction-linked receipt successfully.
+#### Second Acceptance (All Real: reclaim_zkfetch + intel_tdx + x402) ✅
+
+After fixing `proof_generator.py` subprocess timeout from 30s to 90s (Docker image `skottbie/veritask-worker:v3.1.8`) and redeploying the CVM:
+
+1. Real task type: `aave` TVL retrieval ($25,479,162,974)
+2. **ZK layer: `reclaim_zkfetch`** — real Reclaim Protocol zkTLS proof
+   - `claimData.provider`: `http`
+   - `claimData.owner`: `0x95c8c603977827846109784e44e73d79214b0fd6`
+   - `signatures`: 1 attestor signature
+   - `witnesses`: `wss://attestor.reclaimprotocol.org:444/ws`
+3. **TEE layer: `intel_tdx`** — real Phala Cloud CVM TDX Quote (7515 bytes)
+4. Local verification: `is_valid=True, zk_valid=True, tee_valid=True`
+5. **Real x402 settlement**:
+   - `chain_index`: `196` (X Layer mainnet)
+   - `token`: `USDT`
+   - `amount`: `0.01`
+   - `payer`: `0x012E6Cfbbd1Fcf5751d08Ec2919d1C7873A4BB85`
+   - `payee`: `0x871c98e2b2f22b6a215493a96d9eb76ccc0015cb`
+   - `tx_hash`: `0x819c0c984abc8cfe804d7023331f44dff9d439d9507584fb0138eeb7bfdd138f`
+   - `explorer_url`: `https://www.oklink.com/xlayer/tx/0x819c0c984abc8cfe804d7023331f44dff9d439d9507584fb0138eeb7bfdd138f`
+6. This acceptance proves that all three cryptographic guarantee layers are real production-grade components with zero mock or fallback
 
 ## 17. Design Statement / 设计结论
 

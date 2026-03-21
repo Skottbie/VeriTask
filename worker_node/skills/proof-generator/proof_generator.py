@@ -45,7 +45,7 @@ def generate_zk_proof(data_result: dict) -> dict:
             ["node", "--max-old-space-size=4096", str(ZKFETCH_BRIDGE), url],
             capture_output=True,
             text=True,
-            timeout=30,  # 30s to fit within proxy timeouts; zkFetch may need more
+            timeout=90,  # 90s — Reclaim zkFetch Gnark prover needs 30-60s on CVM
             cwd=str(SKILL_DIR.parent.parent.parent),  # monorepo root for node_modules
         )
         stderr_log = (result.stderr or "")[-500:]  # last 500 chars of stderr
@@ -81,13 +81,13 @@ def generate_zk_proof(data_result: dict) -> dict:
                     }
             except (json.JSONDecodeError, KeyError):
                 pass  # stdout was incomplete or invalid, fall through to sha256_mock
-        print(f"\033[33m[Worker-zkTLS] ⚠️  zkFetch timeout (30s). stderr: {stderr_log}\033[0m", file=sys.stderr)
+        print(f"\033[33m[Worker-zkTLS] ⚠️  zkFetch timeout (90s). stderr: {stderr_log}\033[0m", file=sys.stderr)
         return {
             "type": "sha256_mock",
             "hash": data_hash,
             "proof": None,
             "response_body": None,
-            "note": f"fallback: subprocess timeout 30s",
+            "note": f"fallback: subprocess timeout 90s",
             "diag_stderr": stderr_log,
         }
     except Exception as e:

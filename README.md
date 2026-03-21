@@ -331,14 +331,16 @@ Docker: skottbie/veritask-worker:v3.1.7
 
 All 3 payment transactions are publicly verifiable on [OKX X Layer Explorer](https://www.oklink.com/xlayer). Gas cost = 0 for every transaction (OKX facilitator pays).
 
-Latest MCP Phase 1 acceptance transaction:
+Latest MCP Phase 1 acceptance transaction (all crypto layers real, zero mock):
 
 - Date: 2026-03-21
 - Flow: MCP request -> Worker delivery -> proof verification -> x402 settlement -> receipt retrieval
-- Protocol: Aave TVL
+- Protocol: Aave TVL ($25,479,162,974)
+- ZK Layer: `reclaim_zkfetch` — Reclaim Protocol zkTLS, attestor-signed
+- TEE Layer: `intel_tdx` — Phala Cloud CVM real TDX Quote (7515 bytes)
 - Amount: 0.01 USDT on X Layer mainnet
-- txHash: `0xf8c700edb574af275f22c77ec769af54847c91c27d4afaa4e477230eff99bad6`
-- Explorer: https://www.oklink.com/xlayer/tx/0xf8c700edb574af275f22c77ec769af54847c91c27d4afaa4e477230eff99bad6
+- txHash: `0x819c0c984abc8cfe804d7023331f44dff9d439d9507584fb0138eeb7bfdd138f`
+- Explorer: https://www.oklink.com/xlayer/tx/0x819c0c984abc8cfe804d7023331f44dff9d439d9507584fb0138eeb7bfdd138f
 
 ### 3. Reproduce Locally
 
@@ -408,14 +410,15 @@ Notes:
 - `python test_mcp_server.py` does not require the Worker to be online.
 - Real task execution through `submit_defi_tvl_task` still depends on `WORKER_URL` being reachable.
 
-Live acceptance status:
-- MCP Phase 1 acceptance has been validated end-to-end on 2026-03-21.
+Live acceptance status (all crypto layers real, zero mock):
+- MCP Phase 1 acceptance validated end-to-end on 2026-03-21 with **all three cryptographic layers fully real**.
+- Crypto layers: `reclaim_zkfetch` (Reclaim zkTLS) + `intel_tdx` (Phala CVM TDX) + OKX x402 (mainnet USDT)
 - Verified loop: `vt_request_task` -> `vt_get_task_status` -> `vt_get_task_result` -> `vt_verify_result` -> `vt_settle_payment` -> `vt_get_settlement_receipt`
 - Real settlement receipt:
   - payer: `0x012E6Cfbbd1Fcf5751d08Ec2919d1C7873A4BB85`
   - payee: `0x871c98e2b2f22b6a215493a96d9eb76ccc0015cb`
-  - txHash: `0xf8c700edb574af275f22c77ec769af54847c91c27d4afaa4e477230eff99bad6`
-  - explorer: https://www.oklink.com/xlayer/tx/0xf8c700edb574af275f22c77ec769af54847c91c27d4afaa4e477230eff99bad6
+  - txHash: `0x819c0c984abc8cfe804d7023331f44dff9d439d9507584fb0138eeb7bfdd138f`
+  - explorer: https://www.oklink.com/xlayer/tx/0x819c0c984abc8cfe804d7023331f44dff9d439d9507584fb0138eeb7bfdd138f
   - detailed design-side acceptance record: `MCP_VERIFIABLE_TOOL_EXPORT_DESIGN.md` section 16.3
 
 ### Deploy to OpenClaw (WSL)
