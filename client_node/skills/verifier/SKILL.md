@@ -18,6 +18,12 @@ metadata:
 
 ---
 
+## 🌐 Language Rule
+
+**Reply in the same language as the user's input.** Default to English when unclear. Emoji markers and technical data (hashes, addresses) are never translated.
+
+---
+
 ## Pre-flight Checks
 
 | 检查项 | 要求 |

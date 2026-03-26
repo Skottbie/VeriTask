@@ -46,6 +46,8 @@ VERITASK_SKILLS=(
     "task-delegator"
     "verifier"
     "okx-x402-payer"
+    "graph-anchor"
+    "bidding-agent"
     "defi-scraper"
     "proof-generator"
 )
@@ -69,6 +71,14 @@ echo -e "${GREEN}  ✅ verifier deployed${NC}"
 # okx-x402-payer
 cp -r "${SCRIPT_DIR}/client_node/skills/okx-x402-payer/"* "${OPENCLAW_SKILLS}/okx-x402-payer/"
 echo -e "${GREEN}  ✅ okx-x402-payer deployed${NC}"
+
+# graph-anchor
+cp -r "${SCRIPT_DIR}/client_node/skills/graph-anchor/"* "${OPENCLAW_SKILLS}/graph-anchor/"
+echo -e "${GREEN}  ✅ graph-anchor deployed${NC}"
+
+# bidding-agent
+cp -r "${SCRIPT_DIR}/client_node/skills/bidding-agent/"* "${OPENCLAW_SKILLS}/bidding-agent/"
+echo -e "${GREEN}  ✅ bidding-agent deployed${NC}"
 
 # --- Step 4: Copy Worker skills ---
 echo -e "${YELLOW}[Step 4] Deploying Worker skills...${NC}"

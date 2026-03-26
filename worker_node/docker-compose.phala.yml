@@ -1,4 +1,4 @@
-# VeriTask 3.0 — Phala Cloud CVM Deployment
+# VeriTask 3.5 — Phala Cloud CVM Deployment
 # Paste this into Phala Cloud Dashboard → Deploy → docker-compose.yml
 #
 # Prerequisites:
@@ -11,7 +11,7 @@
 
 services:
   worker:
-    image: skottbie/veritask-worker:latest
+    image: skottbie/veritask-worker:v3.5.8
     ports:
       - 8001:8001
     volumes:
@@ -19,3 +19,8 @@ services:
       - /var/run/dstack.sock:/var/run/dstack.sock
     environment:
       - WORKER_PRIVATE_KEY=${WORKER_PRIVATE_KEY}
+      # PCEG API: VTRegistry address on X Layer (required for /pceg/* endpoints)
+      - VT_REGISTRY_ADDRESS=0x849de5a84A8619e076ef28B057b3d56c351453c1
+      - VT_REGISTRY_DEPLOY_BLOCK=55382189
+      # Demo: override seed score for test wallet to show dispute penalty effect
+      - 'DEMO_SEED_OVERRIDES={"0x012e6cfbbd1fcf5751d08ec2919d1c7873a4bb85": 0.3}'

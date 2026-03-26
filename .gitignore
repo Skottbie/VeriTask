@@ -53,4 +53,10 @@ skill_md_wsl_current.txt
 
 # OnchainOS lock file
 skills-lock.json
+
+# Duplicate OnchainOS skills at root (canonical copy in .agents/skills/)
+/skills/
+
+# Archived debug scripts and session logs
+archived/
 TWEET_SCRIPT_v3.md

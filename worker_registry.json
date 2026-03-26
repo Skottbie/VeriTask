@@ -1,0 +1,19 @@
+{
+  "workers": [
+    {
+      "alias": "worker-alpha",
+      "address": "0x871c98e2b2f22b6a215493a96d9eb76ccc0015cb",
+      "url": "https://2d29518d31fd53641b70a1754c79dce1450188b2-8001.dstack-pha-prod9.phala.network"
+    },
+    {
+      "alias": "worker-beta",
+      "address": "0x6c6Fd021Ff91842408c91c7752764da97AEc9Bc4",
+      "url": "https://2d29518d31fd53641b70a1754c79dce1450188b2-8001.dstack-pha-prod9.phala.network"
+    },
+    {
+      "alias": "worker-gamma",
+      "address": "0x51cCB8E0F814679D5328bF37E4Dd96Fe2e436C40",
+      "url": "https://2d29518d31fd53641b70a1754c79dce1450188b2-8001.dstack-pha-prod9.phala.network"
+    }
+  ]
+}

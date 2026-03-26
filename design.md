@@ -1,12 +1,19 @@
-# VeriTask 3 — Design Document
-
-> **Version**: 3.5.0 (Active)  
-> **Last Updated**: 2026-03-12  
+# VeriTask — Design Document
+> **Last Updated**: 2026-03-23  
 > **Project**: VeriTask — Claw-to-Claw (C2C) Verifiable Micro-Procurement Protocol  
-> **Hackathon**: OKX OnchainOS "AI松" (March 2026)  
 > **Stack**: Python 3.12 + Node.js + OpenClaw + OKX OnchainOS Skills  
 > **Author**: [@eazimonizone](https://x.com/eazimonizone) · [Skottbie](https://github.com/Skottbie/)  
 > **Archived Snapshots**: `archived/design_v3.0_snapshot.md`, `archived/design_v3.2_snapshot.md`
+
+---
+
+## 📋 Update Log
+
+| Date | Type | Description | Link |
+|------|------|-------------|------|
+| 2026-03-11 | — | Initial v3.5 design: C2C protocol, dual-model routing, anti-fabrication protocol | *(this document)* |
+| 2026-03-21 | MINOR UPDATE | MCP Verifiable Tool Export — stdio adapter, Phase 1 real acceptance (reclaim_zkfetch + intel_tdx + x402) | [MCP_VERIFIABLE_TOOL_EXPORT_DESIGN.md](MCP_VERIFIABLE_TOOL_EXPORT_DESIGN.md) |
+| 2026-03-26| MAJOR UPDATE 1 | Proof-Conditioned Endorsement Graph — VeriRank (PageRank), on-chain reputation anchoring, dispute anchor, PCEG REST API, OOM fix for 1GB CVM | [design_PCEG.md](MAJOR%20UPDATE1-Proof-Conditioned%20Endorsement%20Graph/design_PCEG.md) · [DEMO.md](MAJOR%20UPDATE1-Proof-Conditioned%20Endorsement%20Graph/DEMO.md) |
 
 ---
 

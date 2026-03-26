@@ -27,6 +27,8 @@
           "CLIENT_PRIVATE_KEY": ""
         }
       },
+      "graph-anchor": { "enabled": true },
+      "bidding-agent": { "enabled": true },
       "okx-wallet-portfolio": { "enabled": true },
       "okx-dex-swap": { "enabled": true },
       "okx-dex-market": { "enabled": true },
@@ -34,5 +36,5 @@
       "okx-onchain-gateway": { "enabled": true }
     }
   },
-  "version": "3.2.0"
+  "version": "3.5.0"
 }

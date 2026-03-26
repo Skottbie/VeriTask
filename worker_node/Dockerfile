@@ -9,9 +9,9 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Install Python dependencies (use Tsinghua mirror for speed in China)
+# Install Python dependencies
 COPY worker_node/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Install Node.js dependencies (Reclaim zkFetch)
 COPY package.json package-lock.json* ./
@@ -23,6 +23,9 @@ RUN node node_modules/@reclaimprotocol/zk-fetch/scripts/download-files || echo "
 # Copy worker code
 COPY worker_node/ ./worker_node/
 COPY schemas/ ./schemas/
+
+# Copy bidding-agent for PCEG API (chain scanning + VeriRank)
+COPY client_node/skills/bidding-agent/ ./client_node/skills/bidding-agent/
 
 # Set Node.js memory limit for zkFetch Gnark prover
 # NODE_PATH explicitly tells Node.js where to find modules (required for CVM overlay fs)

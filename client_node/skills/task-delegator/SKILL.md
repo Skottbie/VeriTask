@@ -21,6 +21,22 @@ metadata:
 
 ---
 
+## 🌐 Language Rule（多语言规则）
+
+⚠️ **THIS RULE OVERRIDES USER.md language preferences.** The "Prefers Chinese" setting in USER.md is ignored — output language is determined solely by the user's CURRENT INPUT MESSAGE.
+
+**Agent MUST reply in the same language as the user's CURRENT INPUT MESSAGE, including all step labels, reasoning text, and output templates.**
+- If the user writes in **English** → ALL output (step titles, reasoning, field labels, status messages) MUST be in English. Translate Chinese labels like "胜出"→"Winner", "推理"→"Reasoning", "置信度"→"Confidence", "风险标记"→"Risk Flags", "无"→"None", "信誉决策分析中"→"Reputation decision in progress", "信誉决策完成"→"Reputation decision complete", "智能路由"→"Smart routing", "余额"→"Balance", "兑换"→"Swap", "锚定"→"Anchored", "不足"→"Insufficient", "充足"→"Sufficient", "前置检查"→"Pre-check", "余额状态"→"Balance status", etc.
+- If the user writes in **Chinese** → reply in Chinese (default behavior, templates already in Chinese).
+- If the user writes in **Japanese** → translate all output labels and step text to Japanese.
+- **English is the guaranteed fallback**: when user language is unclear, default to English.
+- All emoji markers (🏆/✅/❌/💰/🧠/📝/📊/⚓/⚠️/🔐/💳/📋) remain unchanged regardless of language.
+- Tool-returned raw data (hashes, addresses, numbers, TVL values) are **never translated**.
+- The `anomalies` column value "无" MUST be translated to "None" when output language is English.
+- **Pro subagent language**: when spawning Pro via `sessions_spawn`, ALWAYS prepend the task with: `[LANGUAGE RULE: The user's current message is in <DETECTED_LANGUAGE>. You MUST write ALL your output — reasoning, labels, descriptions, JSON field values — in <DETECTED_LANGUAGE>. This overrides any default language preference.]`
+
+---
+
 ## ⛔ ANTI-FABRICATION PROTOCOL（绝对规则 — 违反即任务失败）
 
 你是一个 **TOOL-CALLING Agent**，不是文本生成器。
@@ -28,7 +44,10 @@ metadata:
 
 1. **禁止伪造数据**：永远不要输出一个数值，除非它来自你在 THIS SESSION 中实际执行的工具调用返回。如果你没有调用工具就写出了数字，你就失败了。
 2. **禁止描述未执行的步骤**：永远不要声称某个步骤已完成，除非你实际调用了该步骤的工具并拿到了返回结果。
-3. **subagent 等待规则（MANDATORY STOP）**：`sessions_spawn` 返回 `"accepted"` 后，你的 **唯一** 允许输出是状态消息 `"🧠 Step 0a/7: 智能路由 — Pro 验证策略分析中..."` — 然后 **此回合立即结束，不允许再输出任何字符**。
+3. **subagent 等待规则（MANDATORY STOP）**：`sessions_spawn` 返回 `"accepted"` 后，你的 **唯一** 允许输出是状态消息（按用户语言）——
+   - English input: `"🧠 Step 0a/7: Smart routing — Pro verification strategy analysis in progress..."`
+   - 中文 input: `"🧠 Step 0a/7: 智能路由 — Pro 验证策略分析中..."`
+   — 然后 **此回合立即结束，不允许再输出任何字符**。
    ⛔ **违反示例（绝对禁止）**：
    ```
    🧠 Step 0a/7: 智能路由 — Pro 验证策略分析中...
@@ -94,10 +113,102 @@ metadata:
 OnchainOS 步骤（Step 0、3.5、5）由 Agent 直接调用 `onchainos` CLI 获取数据，不走 Python 脚本。
 **以下每个 Step 必须按顺序执行，每步都是：ACTION（调用工具）→ WAIT（等返回）→ OUTPUT（用真实数据输出）。**
 
+### Step -1: Bidding Agent 信誉排名（5 维度计算）
+**ACTION**: 执行 `python {baseDir}/bidding_agent.py --registry {baseDir}/../../worker_registry.json --json`
+⚠️ 脚本路径: `skills/bidding-agent/bidding_agent.py`，registry 路径: `worker_registry.json`（项目根目录）。如果路径报错，先用 `find . -name bidding_agent.py` 和 `find . -name worker_registry.json` 定位实际路径后重试。
+**WHEN TOOL RETURNS**: 解析 JSON 数组，每个元素包含 5 维度评估数据：
+  - ① `verirank` — VeriRank 信誉分
+  - ② `edge_count` — 历史交付量
+  - ③ `last_active` — 最近活跃时间戳（Unix epoch）
+  - ④ `tee_stable` — TEE 硬件一致性（bool）
+  - ⑤ `endorser_mean` / `endorser_std` — 背书方质量分布
+  - `anomalies` — 异常标记（`isolated_endorser`, `client_clique`）
+  → 如果返回空数组或所有 Worker `final_score == 0` → 输出 "⚠️ 无可用 Worker（链上无信誉数据）" → 降级为 `$WORKER_URL` 环境变量，跳过 Step 0 Bidding
+  → 否则，将完整 JSON 保存到上下文，继续 Step 0 Bidding
+
+### Step 0 Bidding: Spawn Pro 信誉决策
+**ACTION**: 调用 `sessions_spawn(agentId="pro", mode="run", task="<下方 Bidding Decision 任务模板>")`
+**WHEN TOOL RETURNS "accepted"**:
+  → 输出（按用户语言）:
+    - English: `🏆 Step 0 Bidding: Reputation decision in progress...`
+    - 中文: `🏆 Step 0 Bidding: Pro 信誉决策分析中...`
+  → ⛔ **MANDATORY STOP** — 等待 Pro completion event（30-120 秒）
+**WHEN PRO COMPLETION EVENT ARRIVES**:
+  → 解析 Pro 返回的 JSON（`winner`, `reasoning`, `confidence`, `risk_flags`）
+  → **必须输出完整 Bidding 决策报告**，所有标签需与用户输入语言一致（英文用户→英文标签，中文用户→中文标签），保留表格+排名+推理原文：
+    - 英文用户 (English user):
+    ```
+    🏆 Step 0 Bidding: Reputation decision complete
+    | Worker | alias | final_score | verirank | edge_count | last_active | tee_stable | endorser_mean | anomalies |
+    |--------|-------|-------------|----------|------------|-------------|------------|---------------|-----------|
+    | <addr> | <alias> | <score>   | <pr>     | <cnt>      | <time>      | <bool>     | <mean>        | <flags>   |
+    🏆 Winner: <winner alias> (<winner full address>)
+    📝 Reasoning: <reasoning in English>
+    📊 Confidence: <confidence> | ⚠️ Risk Flags: <risk_flags list, "None" if empty>
+    ```
+    - 中文用户 (Chinese user):
+    ```
+    🏆 Step 0 Bidding: 信誉决策完成
+    | Worker | alias | final_score | verirank | edge_count | last_active | tee_stable | endorser_mean | anomalies |
+    |--------|-------|-------------|----------|------------|-------------|------------|---------------|-----------|
+    | <addr> | <alias> | <score>   | <pr>     | <cnt>      | <time>      | <bool>     | <mean>        | <flags>   |
+    🏆 胜出: <winner alias> (<winner 完整地址>)
+    📝 推理: <reasoning 完整原文>
+    📊 置信度: <confidence> | ⚠️ 风险标记: <risk_flags 列表，无则填"无">
+    ```
+  → ⛔ **禁止**只输出 "选择 Worker <地址>" 这样的简短摘要 — 必须完整输出上方表格和推理
+  → 将 `winner` 的 `url` 字段作为后续 Step 1-2 的 Worker URL
+  → 如果 `confidence < 0.3` 或 `risk_flags` 包含 "critical" → 输出风险警告，询问用户是否继续
+  → 继续 Step 0a
+**PRO TIMEOUT (120s)**:
+  → 降级为 Flash 自主决策：直接使用 Step -1 中 `final_score` 最高的 Worker
+  → 输出（按用户语言）:
+    - English: "⚠️ Pro timeout, downgrading to Flash — selecting highest-reputation Worker <address>"
+    - 中文: "⚠️ Pro 超时，降级为 Flash — 选择信誉最高 Worker <address>"
+
+**Bidding Decision 任务模板**（传给 Pro 的 task 参数）：
+
+```
+分析以下 VeriTask Worker 候选人的 5 维度信誉评估数据，选出最佳 Worker 执行即将到来的任务。
+
+候选人数据：
+{Step -1 返回的完整 JSON 数组}
+
+评估维度权重参考：
+① 信誉分（VeriRank）：核心维度，反映被高信誉 Client 背书的累积信任度
+② 历史交付量（edge_count）：交付多 = 有实际工作记录
+③ 最近活跃时间（last_active）：5分钟前 vs 30天前 = 可用性差异巨大
+④ TEE 硬件一致性（tee_stable）：指纹变更可能意味着欺诈或正常硬件升级
+⑤ 背书方质量（endorser_mean/endorser_std）：高信誉 Client 背书 vs 新钱包背书 = 信号质量不同
+
+异常标记含义：
+- isolated_endorser：仅被 1 个 Client 背书 → 可能是 Sybil 攻击
+- client_clique：背书方之间互相关联 → 可能是合谋刷信誉
+
+维度冲突处理示例：
+- "Worker A 信誉最高但 20 天未活跃；Worker B 信誉稍低但 3 分钟前刚完成任务" → 权衡可用性 vs 信誉
+- "Worker B 交付量多但 TEE 指纹不一致（tee_stable=false）" → 推理：正常升级还是换皮洗历史？
+- "Worker C 所有背书方都是新钱包（低 endorser_mean）" → Sybil 风险评估
+
+请输出 JSON：
+{
+  "winner": "<worker_address>",
+  "reasoning": "<WRITE IN THE SAME LANGUAGE AS THE USER'S MESSAGE THAT TRIGGERED THIS TASK. If user wrote English, write English reasoning here. If user wrote Chinese, write Chinese.>",
+  "confidence": <0.0-1.0>,
+  "risk_flags": ["<LABELS IN USER'S LANGUAGE: if English, use English labels like 'tee_unstable', 'isolated_endorser', etc.>"]
+}
+
+⛔ 工具限制（必须遵守）：
+1. 绝对禁止使用 message 工具。
+2. 完成后系统 announce step 中，仅回复: ANNOUNCE_SKIP
+```
+
 ### Step 0a: Spawn Pro 验证策略分析
 **ACTION**: 调用 `sessions_spawn(agentId="pro", mode="run", task="<下方任务模板>")`
 **WHEN TOOL RETURNS "accepted"**:
-  → 输出: `🧠 Step 0a/7: 智能路由 — Pro 验证策略分析中...`
+  → 输出（按用户语言）:
+    - English: `🧠 Step 0a/7: Smart routing — Pro verification strategy analysis in progress...`
+    - 中文: `🧠 Step 0a/7: 智能路由 — Pro 验证策略分析中...`
   → ⛔ **MANDATORY STOP** — 输出上述占位符后，**此回合立即结束**。不允许再输出任何字符、任何 Step、任何内容。下一个输出只能在收到 Pro completion event 后产生。
   → Pro completion event 会以 user message 形式到达（通常 30-120 秒）
   → 120 秒未到达 → 降级为 Flash 自主推理，注明 "⚠️ Pro 超时，降级为 Flash 推理"
@@ -187,8 +298,32 @@ OnchainOS 步骤（Step 0、3.5、5）由 Agent 直接调用 `onchainos` CLI 获
 **THEN**: 将 Worker 交付物与 Step 0d 收集的 OnchainOS 参考数据逐维度对比
   → 输出 Cross-Verify 结果（每维度: OnchainOS值 vs Worker值 → ✅/⚠️/❌）
   → 综合判定（✅合理 / ⚠️偏差可接受 / ❌矛盾建议暂停）
-  → 如果 is_valid: false → **停止流程，确认支付未执行，报告失败原因**
-→ 继续 Step 3.5
+  → 如果 is_valid: false:
+    **停止流程，确认支付未执行，报告失败原因**
+    然后解析返回 JSON 中的 `dispute` 字段并按以下模板输出（**禁止跳过，即使 dispute 为 null**）：
+    - 如果 `dispute.status == "dispute_anchored"`:
+      - 中文用户:
+        ```
+        ⚓ Dispute Anchor: 负向信誉边已锚定至 X Layer
+        - 原因: <dispute_reason>（zk_proof_invalid / tee_attestation_invalid / full_proof_failure）
+        - Dispute txHash: <tx_hash>（完整66字符，禁止截断）
+        - Explorer: https://www.oklink.com/xlayer/tx/<tx_hash>
+        ```
+      - English user:
+        ```
+        ⚓ Dispute Anchor: Negative reputation edge anchored to X Layer
+        - Reason: <dispute_reason>
+        - Dispute txHash: <tx_hash> (full 66 chars)
+        - Explorer: https://www.oklink.com/xlayer/tx/<tx_hash>
+        ```
+    - 如果 `dispute.status == "failed"` 或 `dispute` 含 `error` 字段:
+      - 中文: `⚓ Dispute Anchor: 锚定失败（非阻断）: <error>`
+      - English: `⚓ Dispute Anchor: Failed (non-blocking): <error>`
+    - 如果 `dispute` 为 `null` 或 JSON 中无 `dispute` 键:
+      - 中文: `⚓ Dispute Anchor: 跳过（Worker 地址未提供或 skip_anchor=true）`
+      - English: `⚓ Dispute Anchor: Skipped (no worker address or skip_anchor=true)`
+    ⛔ **此后终止流程，不执行 Step 3.5 / Step 4 / Step 4.5 / Step 5 / Step 6**
+→ 继续 Step 3.5（仅当 is_valid: true 时）
 
 ### Step 3.5: OnchainOS Gas 估算
 **ACTION**: 执行 `onchainos gateway gas --chain xlayer`
@@ -196,9 +331,41 @@ OnchainOS 步骤（Step 0、3.5、5）由 Agent 直接调用 `onchainos` CLI 获
 → 继续 Step 4
 
 ### Step 4: x402 支付
-**ACTION**: 执行 `python {baseDir}/task_delegator.py --protocol <protocol> --amount <amount> --json`（若用户未指定 --skip-payment）
-**WHEN TOOL RETURNS**: 输出 tx_hash + explorer_url
-  → 如果用户指定了 --skip-payment 或 is_valid 为 false → 跳过此步骤
+**ACTION**: 执行 `python {baseDir}/okx_x402_payer.py --to <worker_address> --amount <amount> --json`（若用户未指定 --skip-payment）
+⚠️ 脚本路径: `skills/task-delegator/okx_x402_payer.py`（如路径报错，先用 `find . -name okx_x402_payer.py` 定位）
+**WHEN TOOL RETURNS**: 解析 JSON 输出，提取 `tx_hash` 字段：
+  → 💳 **支付结果**: 输出完整 `tx_hash`（66字符含0x前缀，**禁止截断**） + Explorer 链接 `https://www.oklink.com/xlayer/tx/<tx_hash>`
+  → 如果 `success: false` 或无 tx_hash → **终止流程，报告失败原因**
+  → 如果用户指定了 --skip-payment 或 is_valid 为 false → 跳过此步骤，直接跳至 Step 5
+→ 继续 Step 4.5
+
+### Step 4.5: Graph Anchor（信誉存证上链）
+> ⛔ **仅当 Step 4 支付成功（已获得 tx_hash）且 is_valid=true 时执行。否则跳过，继续 Step 5。**
+
+**ACTION**: 将 Step 2 返回的 ProofBundle JSON 补充 `amount_usdt` 字段后，执行：
+  `python {skillsDir}/graph-anchor/graph_anchor.py --bundle '<proof_bundle_with_amount_json>' --json`
+  ⚠️ 脚本路径: `skills/graph-anchor/graph_anchor.py`（如路径报错，先用 `find . -name graph_anchor.py` 定位）
+  ⚠️ `--bundle` 参数须传入包含 `amount_usdt` 字段的 ProofBundle JSON 字符串（在 Step 2 的 proof_bundle 基础上添加 `"amount_usdt": "<Step 4 支付金额，如 0.01">`）
+**WHEN TOOL RETURNS**: 解析 JSON 输出：
+  - `status == "anchored"` → 输出（按用户语言）:
+    - English:
+    ```
+    ⚓ Graph Anchor: Reputation proof anchored to X Layer
+    - Anchor txHash: <tx_hash> (full 66 chars)
+    - Explorer: https://www.oklink.com/xlayer/tx/<tx_hash>
+    ```
+    - 中文:
+    ```
+    ⚓ Graph Anchor: 信誉证明已锚定至 X Layer
+    - Anchor txHash: <tx_hash>（完整66字符，禁止截断）
+    - Explorer: https://www.oklink.com/xlayer/tx/<tx_hash>
+    ```
+  - `status == "failed"` → 输出（按用户语言）:
+    - English: "⚓ Graph Anchor: Anchoring failed (non-blocking): <error>" → 继续 Step 5
+    - 中文: "⚓ Graph Anchor: 锚定失败（非阻断性错误）: <error>" → 继续 Step 5
+  - 任何异常/超时/命令不存在 → 输出（按用户语言）:
+    - English: "⚓ Graph Anchor: Skipped (error: <reason>)" → 继续 Step 5
+    - 中文: "⚓ Graph Anchor: 跳过（异常: <原因>）" → 继续 Step 5
 → 继续 Step 5
 
 ### Step 5: OnchainOS 交易追踪
@@ -208,16 +375,25 @@ OnchainOS 步骤（Step 0、3.5、5）由 Agent 直接调用 `onchainos` CLI 获
 → 继续 Step 6
 
 ### Step 6: 任务完成摘要
-**OUTPUT**: 汇总完整 ProofBundle + 支付确认 + OnchainOS 参考报告
+**OUTPUT**: 汇总完整任务结果，必须包含以下所有可用项：
+  - 📋 **协议**: 目标 DeFi 协议名称
+  - 📊 **TVL 数据**: Worker 交付的 TVL 值 + 数据时间
+  - 🔐 **验证结果**: Layer 1 (zkTLS/SHA256) + Layer 2 (TDX/Mock) 验证状态
+  - 🔄 **交叉验证**: OnchainOS 参考值 vs Worker 值的对比结论
+  - 💳 **x402 支付**: payment txHash + Explorer 链接（完整 txHash，禁止截断）
+  - ⚓ **Graph Anchor**: Step 4.5 锚定结果的 anchor txHash + Explorer 链接（完整 txHash，禁止截断）。如果 Step 4.5 跳过或失败则注明原因
+  - ⛽ **Gas**: 说明 x402 facilitator 代付 gas（gasless）
+  
+  ⛔ **txHash 显示规则**：所有 txHash（payment 和 anchor）必须显示完整 66 字符（含 0x 前缀），**禁止截断为 0xabcd... 形式**。
 
 ### 翻译规则（读取 JSON.proof_details 中的 type 字段，禁止自由发挥）
 
-| JSON 中 type 值 | 你必须写 | ⛔ 绝对禁止写 |
-|----------------|---------|---------------|
-| `sha256_mock` | "SHA256 数据哈希（zkFetch 降级模式）" | "zkTLS"、"零知识证明" |
-| `reclaim_zkfetch` | "zkTLS 零知识证明（Reclaim zkFetch）" | — |
-| `mock_tdx` | "模拟 TDX（非 TEE 环境，仅用于测试）" | "Intel TDX"、"硬件隔离"、"TEE" |
-| `intel_tdx` | "Intel TDX 硬件可信执行环境（Phala Cloud CVM）" | — |
+| JSON 中 type 值 | 中文用户 | English user | ⛔ 绝对禁止写 |
+|----------------|---------|-------|---------------|
+| `sha256_mock` | "SHA256 数据哈希（zkFetch 降级模式）" | "SHA256 Data Hash (zkFetch Fallback Mode)" | "zkTLS"、"零知识证明" |
+| `reclaim_zkfetch` | "zkTLS 零知识证明（Reclaim zkFetch）" | "zkTLS Zero-Knowledge Proof (Reclaim zkFetch)" | — |
+| `mock_tdx` | "模拟 TDX（非 TEE 环境，仅用于测试）" | "Mock TDX (non-TEE environment, for testing only)" | "Intel TDX"、"硬件隔离"、"TEE" |
+| `intel_tdx` | "Intel TDX 硬件可信执行环境（Phala Cloud CVM）" | "Intel TDX Hardware Trusted Execution Environment (Phala Cloud CVM)" | — |
 
 ### 失败处理（智能重试策略）
 
@@ -298,6 +474,8 @@ onchainos token price-info 0x58D5968b0F1d68818817fa2301131938920973A0 --chain et
 
 | 步骤 | 技能 | 调用方式 | 调用模式 |
 |------|------|---------|---------|
+| Step -1 | `bidding-agent` | `python bidding_agent.py --registry --json` | **强制** |
+| Step 0 Bidding | `sessions_spawn` (agentId="pro") | spawn Pro Agent 信誉决策 | **强制** |
 | Step 0a | `sessions_spawn` (agentId="pro") | spawn Pro Agent 分析验证策略 | **强制** |
 | Step 0b | `okx-wallet-portfolio` | `onchainos portfolio token-balances` | **强制** |
 | Step 0c | `okx-dex-swap` + `swap_and_broadcast.py` | all-balances → quote → swap | 条件（余额不足） |
@@ -306,7 +484,8 @@ onchainos token price-info 0x58D5968b0F1d68818817fa2301131938920973A0 --chain et
 | Step 1-2 | Worker `/execute` | `python task_delegator.py --skip-payment` | **强制** |
 | Step 3 | `verifier` | `verifier.verify_proof_bundle()` | **强制** |
 | Step 3.5 | `okx-onchain-gateway` | `onchainos gateway gas --chain xlayer` | **强制** |
-| Step 4 | `okx-x402-payer` | `okx_x402_payer.execute_payment()` | 可跳过 |
+| Step 4 | `okx-x402-payer` | `okx_x402_payer.py --to <worker> --amount <amt> --json` | 可跳过 |
+| Step 4.5 | `graph-anchor` | `python graph_anchor.py --bundle <proof+amount_usdt> --json` | 条件（Step 4 成功后） |
 | Step 5 | `okx-onchain-gateway` | `onchainos gateway orders --chain xlayer` | **强制** |
 
 **不应调用**：用户只需单独查 TVL（路由 `defi-scraper`）；只需验证证明（路由 `verifier`）；只需付款（路由 `okx-x402-payer`）；只需查余额（路由 `okx-wallet-portfolio`）；只需 swap（路由 `okx-dex-swap`）。
@@ -566,13 +745,28 @@ python {baseDir}/task_delegator.py --protocol uniswap --amount 0.5 --json
 
 ---
 
-## Operation Flow (C2C Full Pipeline v3.3 — Dual-Model Routing + OnchainOS)
+## Operation Flow (C2C Full Pipeline v3.5 — PCEG Bidding + Dual-Model Routing + OnchainOS)
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│      TASK DELEGATOR v3.3 (Dual-Model Routing + OnchainOS)       │
+│   TASK DELEGATOR v3.5 (PCEG Bidding + Dual-Model + OnchainOS)   │
 │                     (Client Orchestrator)                        │
 ├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Step -1: 📊 Bidding Agent 信誉排名 (5-Dim PCEG)                │
+│    [强制] exec bidding_agent.py --registry --json               │
+│      → 从 VTRegistry 合约读取链上信誉图谱                        │
+│      → 5 维度评估: VeriRank / 交付量 / 活跃度 / TEE / 背书质量   │
+│      → 输出排名 JSON（含 anomalies 异常标记）                    │
+│      → 空结果 → 降级 $WORKER_URL，跳过 Step 0 Bidding           │
+│                                                                  │
+│  Step 0 Bidding: 🏆 Pro 信誉决策 (LLM Decision Layer)           │
+│    [强制] spawn Pro Agent (agentId="pro")                       │
+│      → 传入 5 维度评估 JSON                                      │
+│      → Pro 推理维度冲突 + 异常风险                                │
+│      → 返回 {winner, reasoning, confidence, risk_flags}          │
+│      → confidence < 0.3 → 风险警告                               │
+│      → Pro 超时 → 降级 Flash 选 final_score 最高                 │
 │                                                                  │
 │  Step 0a: 🧠 Pro 验证策略分析 (Dual-Model Routing)              │
 │    [强制] spawn Pro 子 Agent (agentId="pro")                   │
@@ -609,6 +803,12 @@ python {baseDir}/task_delegator.py --protocol uniswap --amount 0.5 --json
 │    → if is_valid AND NOT --skip-payment:                         │
 │      okx_x402_payer.execute_payment(to=worker, amount=usdt)      │
 │    → Result: {txHash, explorer_url}                              │
+│                                                                  │
+│  Step 4.5: Graph Anchor（信誉存证上链）(conditional)             │
+│    → if Step 4 支付成功（tx_hash 非空）:                         │
+│      python graph_anchor.py --bundle <proof+amount_usdt> --json  │
+│    → Result: {status: "anchored", tx_hash, order_id}             │
+│    → 失败/异常 → 非阻断性，继续 Step 5                           │
 │                                                                  │
 │  Step 5: OnchainOS 交易追踪                                      │
 │    → onchainos gateway orders --address <WALLET> --chain xlayer  │
@@ -653,12 +853,14 @@ python task_delegator.py --protocol aave --skip-payment --json
 
 ---
 
-## Cross-Skill Workflows (v3.3 — Dual-Model Routing + OnchainOS + VeriTask)
+## Cross-Skill Workflows (v3.5 — PCEG Bidding + Dual-Model Routing + OnchainOS + VeriTask)
 
-本技能是所有子技能的**编排入口**，完整工作流涵盖 5 个 OKX OnchainOS Skills + 4 个 VeriTask Skills：
+本技能是所有子技能的**编排入口**，完整工作流涵盖 5 个 OKX OnchainOS Skills + 5 个 VeriTask Skills：
 
 | 步骤 | 位置 | 技能 | 说明 |
 |------|------|------|------|
+| -1 | Client (Python) | bidding-agent | 📊 5 维度 PCEG 信誉排名 |
+| 0 Bidding | Client (子agent) | sessions_spawn (agentId="pro") | 🏆 Pro 信誉决策（选出最佳 Worker） |
 | 0a | Client (子agent) | sessions_spawn (agentId="pro") | 🧠 验证策略分析（专用 Pro Agent, gemini-3.1-pro-preview） |
 | 0b | Client (onchainos CLI) | okx-wallet-portfolio | 检查 USDT 余额 |
 | 0b | Client (onchainos CLI) | okx-dex-swap | 余额不足时自动换币 |
@@ -668,6 +870,7 @@ python task_delegator.py --protocol aave --skip-payment --json
 | 3 | Client (Python) | verifier | ProofBundle 密码学验证 |
 | 3.5 | Client (onchainos CLI) | okx-onchain-gateway | Gas 估算 + gasless 说明 |
 | 4 | Client (Python) | okx-x402-payer | USDT 链上支付 (gasless) |
+| 4.5 | Client (Python) | graph-anchor | 信誉存证上链 (addEdge on X Layer) |
 | 5 | Client (onchainos CLI) | okx-onchain-gateway | 交易状态追踪 |
 | — | Client | **task-delegator** (本技能) | 串联以上全部 |
 

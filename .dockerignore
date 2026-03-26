@@ -6,6 +6,9 @@
 .git
 *.md
 MustReadFirst_donotcommit
-client_node
+client_node/**
+!client_node/skills/
+!client_node/skills/bidding-agent/
+!client_node/skills/bidding-agent/**
 .agents
 worker_node/.venv

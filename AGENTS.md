@@ -30,6 +30,8 @@ via REST API, with each agent composed of specialized skills.
 | `task-delegator` | **PRIMARY** | Entry point for all C2C flows. Orchestrates OnchainOS checks + Worker delegation + verification + payment + tx tracking. |
 | `verifier` | INTERNAL | Validates ProofBundle cryptographic integrity. Called by task-delegator. |
 | `okx-x402-payer` | INTERNAL | Executes on-chain USDT payment via OKX x402 (gasless). Called after verification. |
+| `graph-anchor` | INTERNAL | Anchors reputation edges on X Layer after successful C2C task. Called by task-delegator at Step 3.5. |
+| `bidding-agent` | INTERNAL | Reads Proof-Conditioned Endorsement Graph from X Layer, ranks Workers by reputation via VeriRank. Called by task-delegator for Worker selection. |
 
 **OKX OnchainOS Skills** (in `.agents/skills/`, installed via `npx skills add okx/onchainos-skills`):
 | Skill | C2C Flow Step | Description |

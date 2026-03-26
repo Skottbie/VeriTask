@@ -30,9 +30,13 @@ load_dotenv(Path(__file__).parent.parent.parent.parent / ".env")
 CLIENT_SKILLS = Path(__file__).parent.parent
 sys.path.insert(0, str(CLIENT_SKILLS / "verifier"))
 sys.path.insert(0, str(CLIENT_SKILLS / "okx-x402-payer"))
+sys.path.insert(0, str(CLIENT_SKILLS / "graph-anchor"))
+sys.path.insert(0, str(CLIENT_SKILLS / "bidding-agent"))
 
 from verifier import verify_proof_bundle        # noqa: E402
 from okx_x402_payer import execute_payment       # noqa: E402
+from graph_anchor import anchor_proof, anchor_dispute  # noqa: E402
+from bidding_agent import rank_workers, load_registry  # noqa: E402
 
 
 def is_retryable_worker_error(exc: requests.RequestException) -> bool:
@@ -49,6 +53,7 @@ def delegate_task(
     worker_url: str,
     amount_usdt: float = 1.0,
     skip_payment: bool = False,
+    skip_anchor: bool = False,
 ) -> dict:
     """
     Execute full C2C verifiable micro-procurement flow.
@@ -117,7 +122,35 @@ def delegate_task(
 
     if not verification["is_valid"]:
         print(f"\033[31m[Client] ❌ Proof verification failed! Payment aborted.\033[0m")
-        return {"success": False, "error": "Proof verification failed", "verification": verification}
+
+        # Anchor a dispute edge for cryptographically verifiable failures
+        dispute_result = None
+        worker_address = proof_bundle.get("worker_pubkey", "")
+        if worker_address and not skip_anchor:
+            # Determine dispute_reason from verification details
+            zk_ok = verification.get("zk_valid", False)
+            tee_ok = verification.get("tee_valid", False)
+            if not zk_ok and not tee_ok:
+                dispute_reason = "full_proof_failure"
+            elif not zk_ok:
+                dispute_reason = "zk_proof_invalid"
+            else:
+                dispute_reason = "tee_attestation_invalid"
+
+            print(f"\033[33m[Client] ⚠️  Anchoring dispute edge (reason: {dispute_reason})...\033[0m")
+            try:
+                dispute_result = anchor_dispute(worker_address, dispute_reason)
+            except Exception as e:
+                print(f"\033[33m[Client] ⚠️  Dispute anchor failed (non-blocking): {e}\033[0m",
+                      file=sys.stderr)
+                dispute_result = {"status": "failed", "error": str(e)}
+
+        return {
+            "success": False,
+            "error": "Proof verification failed",
+            "verification": verification,
+            "dispute": dispute_result,
+        }
 
     # Step 4: Pay Worker (if not skipped)
     payment_result = None
@@ -135,6 +168,23 @@ def delegate_task(
             print(f"\033[31m[Client] ❌ Payment failed: {e}\033[0m", file=sys.stderr)
             payment_result = {"success": False, "error": str(e)}
 
+    # Step 3.5: Anchor reputation edge on X Layer (Graph Anchor)
+    anchor_result = None
+    if skip_anchor:
+        print(f"\n\033[33m[Client] ⏭️  Graph Anchor skipped (--skip-anchor flag)\033[0m")
+    elif not verification["is_valid"]:
+        pass  # never anchor a failed verification
+    elif skip_payment:
+        print(f"\n\033[33m[Client] ⏭️  Graph Anchor skipped (no payment = no reputation edge)\033[0m")
+    else:
+        print(f"\n\033[36m[Client] ⚓ Anchoring reputation edge to X Layer...\033[0m")
+        try:
+            anchor_bundle = {**proof_bundle, "amount_usdt": str(amount_usdt)}
+            anchor_result = anchor_proof(anchor_bundle)
+        except Exception as e:
+            print(f"\033[33m[Client] ⚠️  Graph Anchor failed (non-blocking): {e}\033[0m", file=sys.stderr)
+            anchor_result = {"status": "failed", "error": str(e)}
+
     # Summary
     print(f"\n\033[36m{'='*60}\033[0m")
     print(f"\033[36m[Client] 📊 Mission Summary\033[0m")
@@ -151,6 +201,15 @@ def delegate_task(
         print(f"  Payment:     ⏭️ Skipped")
     else:
         print(f"  Payment:     ⚠️ Not executed")
+
+    if anchor_result and anchor_result.get("status") == "anchored":
+        print(f"  Anchor:      ✅ {anchor_result.get('tx_hash', 'N/A')}")
+    elif anchor_result and anchor_result.get("dry_run"):
+        print(f"  Anchor:      🔍 Dry-run (calldata built)")
+    elif skip_anchor or skip_payment:
+        print(f"  Anchor:      ⏭️ Skipped")
+    else:
+        print(f"  Anchor:      ⚠️ Not executed")
 
     return {
         "success": True,
@@ -171,23 +230,50 @@ def delegate_task(
         },
         "verification": verification,
         "payment": payment_result,
+        "anchor": anchor_result,
     }
 
 
 def main():
     parser = argparse.ArgumentParser(description="VeriTask C2C Task Delegator")
     parser.add_argument("--protocol", default="aave", help="DeFi protocol slug")
-    parser.add_argument("--worker-url", default=os.getenv("WORKER_URL", "http://127.0.0.1:8001"))
+    parser.add_argument("--worker-url", default="")
+    parser.add_argument("--registry", default="", help="Path to worker_registry.json for auto-selection")
     parser.add_argument("--amount", type=float, default=1.0, help="USDT payment amount")
     parser.add_argument("--skip-payment", action="store_true", help="Skip x402 payment step")
+    parser.add_argument("--skip-anchor", action="store_true", help="Skip Graph Anchor step")
     parser.add_argument("--json", action="store_true", help="Output result as JSON")
     args = parser.parse_args()
 
+    worker_url = args.worker_url
+
+    # Auto-select worker via Bidding Agent if --registry is provided
+    if args.registry and not worker_url:
+        registry_data = load_registry(args.registry)
+        if not registry_data:
+            print("\033[31m[Client] ❌ No workers in registry\033[0m", file=sys.stderr)
+            sys.exit(1)
+        addresses = [w["address"] for w in registry_data if w.get("address")]
+        url_map = {w["address"].lower(): w.get("url", "") for w in registry_data}
+        print(f"\033[36m[Client] 🏆 Running Bidding Agent on {len(addresses)} candidates...\033[0m")
+        ranked = rank_workers(addresses)
+        if ranked:
+            winner = ranked[0]["worker"]
+            worker_url = url_map.get(winner.lower(), "")
+            print(f"\033[32m[Client] ✅ Best Worker: {winner} (score={ranked[0]['final_score']:.6f})\033[0m")
+        else:
+            print("\033[31m[Client] ❌ Bidding Agent returned no results\033[0m", file=sys.stderr)
+            sys.exit(1)
+
+    if not worker_url:
+        worker_url = os.getenv("WORKER_URL", "http://127.0.0.1:8001")
+
     result = delegate_task(
         protocol=args.protocol,
-        worker_url=args.worker_url,
+        worker_url=worker_url,
         amount_usdt=args.amount,
         skip_payment=args.skip_payment,
+        skip_anchor=args.skip_anchor,
     )
 
     if args.json:
