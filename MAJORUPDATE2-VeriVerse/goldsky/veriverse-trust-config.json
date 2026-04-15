@@ -1,0 +1,18 @@
+﻿{
+  "version": "1",
+  "name": "veriverse-trust",
+  "abis": {
+    "vtregistry": {
+      "path": "./vtregistry.abi.json"
+    }
+  },
+  "instances": [
+    {
+      "abi": "vtregistry",
+      "address": "0x02eDBBB5ECDb56aCB4b25CFAF7279f8E6D81F8E4",
+      "startBlock": 57289287,
+      "chain": "x1"
+    }
+  ]
+}
+

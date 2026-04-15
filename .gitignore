@@ -64,3 +64,6 @@ VeriTask_v1_post.md
 参赛推文_v2.md
 
 MAJOR UPDATE2- VeriVerse/Diamond档位方案.md
+
+# Ignore nested git metadata backup when flattening MAJORUPDATE2-VeriVerse
+MAJORUPDATE2-VeriVerse/.git.nested-backup/

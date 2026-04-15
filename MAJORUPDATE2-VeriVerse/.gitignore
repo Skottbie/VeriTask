@@ -1,0 +1,64 @@
+# Dependencies and build outputs
+node_modules/
+artifacts/
+cache/
+**/__pycache__/
+**/*.pyc
+**/.cache/
+__pycache__/
+*.pyc
+*.pyo
+skills/**/__pycache__/
+skills/**/.cache/
+
+# Local tool state
+.cache/
+.openclaw/
+.tmp_*/
+.tmp_*.mjs
+dashboard/index_backup.html
+dashboard/index_backup2.html
+
+# Internal-only docs (default not public)
+AGENTS.md
+HEARTBEAT.md
+IDENTITY.md
+SOUL.md
+USER.md
+TOOLS.md
+memory/
+openclaw.json
+
+# Internal planning docs (not public)
+PRD.md
+design.md
+Diamond档位方案.md
+INFO4P2.MD
+DAO_REVIEWER_ZKTLS_RECOMMENDED_DESIGN.md
+tmp_p3_p4_dual_audit_2026-04-11.md
+addresses.backup.atomic-20260413.json
+
+# Internal evidence archive (not public)
+tmp_archive/
+data/semaphore-identities/
+data/audit/
+data/agents/*
+!data/agents/schema.json
+tmp/*
+!tmp/closure_mermaid_pack_2026-04-15.md
+tmp/agent4_proof.json
+tmp/openclaw_log_analysis_2026-04-15.md
+tmp/tmp_refactor_plan_2026-04-15.md
+tmp/public_docs_release_assessment_2026-04-15.md
+tmp/public_release_strategy_itemized_review_2026-04-15.md
+tmp/public_commit_readiness_report_2026-04-15.md
+utputFormat
+
+# Public docs (keep)
+!README.md
+!P3_Challenge_Acceptance_Report_ZH_EN_2026-04-11.md
+!Semaphore_Authorization_Design_P4.md
+!tmp/closure_mermaid_pack_2026-04-15.md
+!addresses.json
+!docs/public/
+!docs/public/**

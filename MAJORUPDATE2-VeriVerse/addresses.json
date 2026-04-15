@@ -1,0 +1,13 @@
+{
+  "xlayer": {
+    "VTRegistry": "0x02eDBBB5ECDb56aCB4b25CFAF7279f8E6D81F8E4",
+    "deployer": "0x012E6Cfbbd1Fcf5751d08Ec2919d1C7873A4BB85",
+    "deployedAt": "2026-04-13T05:32:03.144Z",
+    "VeriEscrow": "0x9c2B78E6F3499b8a7aC356c8fFaCEe95939aC1b2",
+    "USDT": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
+    "escrowDeployedAt": "2026-04-13T05:32:39.454Z",
+    "VeriSBT": "0xA760B5F5917Ac4d6c4949E75DAd744Fb6fE916E0",
+    "Semaphore": "0xa83F84B63ebAaCe25456f78aC624BD7Be35B2154",
+    "sbtDeployedAt": "2026-04-13T05:32:39.454Z"
+  }
+}
