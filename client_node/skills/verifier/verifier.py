@@ -16,6 +16,9 @@ import hashlib
 import json
 import sys
 
+from eth_account import Account
+from eth_account.messages import encode_defunct
+
 
 def verify_zk_proof(data: dict, zk_proof: dict) -> tuple[bool, str]:
     """
@@ -71,14 +74,54 @@ def verify_tee_attestation(data: dict, tee_attestation: dict) -> tuple[bool, str
         return False, f"Unknown attestation type: {att_type}"
 
 
-def verify_proof_bundle(bundle: dict) -> dict:
+def verify_origin_signature(data: dict, worker_pubkey: str, origin_auth: dict) -> tuple[bool, str]:
+    """
+    Verify bundle origin by EIP-191 signature over canonical payload hash.
+    """
+    if not isinstance(origin_auth, dict):
+        return False, "origin_auth missing"
+
+    payload_hash = str(origin_auth.get("payload_hash", "")).strip().lower()
+    signature = str(origin_auth.get("signature", "")).strip()
+    signer = str(origin_auth.get("signer", "")).strip()
+
+    if not payload_hash:
+        return False, "origin_auth.payload_hash missing"
+    if not signature:
+        return False, "origin_auth.signature missing"
+
+    data_json = json.dumps(data, sort_keys=True)
+    expected_hash = hashlib.sha256(data_json.encode()).hexdigest().lower()
+    if payload_hash != expected_hash:
+        return False, "origin_auth.payload_hash does not match canonical data hash"
+
+    try:
+        message = encode_defunct(text=payload_hash)
+        recovered = Account.recover_message(message, signature=signature)
+    except Exception as exc:
+        return False, f"origin signature recovery failed: {exc}"
+
+    if signer and recovered.lower() != signer.lower():
+        return False, f"origin signer mismatch: recovered {recovered}, declared {signer}"
+
+    zero_addr = "0x0000000000000000000000000000000000000000"
+    worker_addr = str(worker_pubkey or "").strip()
+    if worker_addr and worker_addr.lower() != zero_addr and recovered.lower() != worker_addr.lower():
+        return False, f"origin signer mismatch with worker_pubkey: recovered {recovered}, worker {worker_addr}"
+
+    return True, f"Origin signature verified — signer {recovered}"
+
+
+def verify_proof_bundle(bundle: dict, require_signature: bool = False) -> dict:
     """
     Full verification of a ProofBundle.
-    Returns: {is_valid: bool, zk_valid: bool, tee_valid: bool, reason: str, details: [...]}
+    Returns: {is_valid: bool, zk_valid: bool, tee_valid: bool, origin_valid: bool|None, reason: str, details: [...]} 
     """
     data = bundle.get("data", {})
     zk_proof = bundle.get("zk_proof", {})
     tee_attestation = bundle.get("tee_attestation", {})
+    worker_pubkey = bundle.get("worker_pubkey", "")
+    origin_auth = bundle.get("origin_auth")
 
     details = []
 
@@ -94,7 +137,26 @@ def verify_proof_bundle(bundle: dict) -> dict:
     details.append(f"[TEE] {status_icon} {tee_reason}")
     print(f"\033[{'32' if tee_valid else '31'}m[Client-Verifier] {status_icon} TEE Attestation: {tee_reason}\033[0m")
 
-    is_valid = zk_valid and tee_valid
+    origin_valid = None
+    origin_reason = "Origin signature not provided"
+    if isinstance(origin_auth, dict):
+        origin_valid, origin_reason = verify_origin_signature(data, worker_pubkey, origin_auth)
+    elif require_signature:
+        origin_valid = False
+        origin_reason = "Origin signature required but missing"
+
+    if origin_valid is None:
+        details.append(f"[Origin] ⏭️ {origin_reason}")
+        print(f"\033[33m[Client-Verifier] ⏭️ Origin Signature: {origin_reason}\033[0m")
+    else:
+        status_icon = "✅" if origin_valid else "❌"
+        details.append(f"[Origin] {status_icon} {origin_reason}")
+        print(f"\033[{'32' if origin_valid else '31'}m[Client-Verifier] {status_icon} Origin Signature: {origin_reason}\033[0m")
+
+    if require_signature:
+        is_valid = zk_valid and tee_valid and bool(origin_valid)
+    else:
+        is_valid = zk_valid and tee_valid and (origin_valid is not False)
     reason = "All proofs verified" if is_valid else "One or more proofs failed"
 
     overall_icon = "✅" if is_valid else "❌"
@@ -104,6 +166,8 @@ def verify_proof_bundle(bundle: dict) -> dict:
         "is_valid": is_valid,
         "zk_valid": zk_valid,
         "tee_valid": tee_valid,
+        "origin_valid": origin_valid,
+        "origin_required": require_signature,
         "reason": reason,
         "details": details,
     }
@@ -113,6 +177,11 @@ def main():
     parser = argparse.ArgumentParser(description="Verify a VeriTask ProofBundle")
     parser.add_argument("--bundle", help="Path to ProofBundle JSON file")
     parser.add_argument("--stdin", action="store_true", help="Read ProofBundle from stdin")
+    parser.add_argument(
+        "--require-origin-signature",
+        action="store_true",
+        help="Require origin_auth signature and fail when missing/invalid",
+    )
     parser.add_argument("--json", action="store_true", help="Output result as JSON")
     args = parser.parse_args()
 
@@ -128,7 +197,7 @@ def main():
 
     print(f"\033[36m[Client-Verifier] 🔍 Verifying ProofBundle (task: {bundle.get('task_id', 'N/A')})...\033[0m")
 
-    result = verify_proof_bundle(bundle)
+    result = verify_proof_bundle(bundle, require_signature=args.require_origin_signature)
 
     if args.json:
         print(json.dumps(result, indent=2))
