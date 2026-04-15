@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="Veri.jpg" alt="Veri Agent" width="200"/>
+  <img src="Veri_v2.png" alt="Veri Agent" width="200"/>
 </p>
 
-<h1 align="center">VeriTask</h1>
+<h1 align="center">VeriAgent</h1>
 
 <p align="center">
   <strong>Claw-to-Claw (C2C) Verifiable Micro-Procurement Protocol</strong><br/>
@@ -47,6 +47,10 @@ Season 2 focuses on the integrated launchpad loop:
 - Skills (public, lightly desensitized): [MAJORUPDATE2-VeriVerse/skills](MAJORUPDATE2-VeriVerse/skills)
 
 中文说明：本次 Build X Season 2 参赛主体为 MAJORUPDATE2-VeriVerse，属于 VeriTask/VeriAgent 的重大版本升级，二者是一体化演进关系。
+
+---
+
+VeriTask (Build X Season 1)
 
 <p align="center">
   <a href="#live-demo">Live Demo</a> •
